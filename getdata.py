@@ -21,8 +21,8 @@ import yfinance as yf
 BYBIT_BASE_URL = "https://api.bybit.com"
 UPBIT_BASE_URL = "https://api.upbit.com/v1"
 
-# Rate Limit 대기 시간 (초)
-RATE_LIMIT_DELAY = 0.1  # 요청 간 대기 시간
+# Rate Limit 대기 시간
+RATE_LIMIT_DELAY = 0.1  
 
 # Bybit 지원 심볼 조회
 def get_bybit_symbols():
@@ -44,7 +44,7 @@ def get_bybit_symbols():
 def get_upbit_markets():
     url = f"{UPBIT_BASE_URL}/market/all"
     response = requests.get(url)
-    time.sleep(RATE_LIMIT_DELAY)  # 요청 후 대기
+    time.sleep(RATE_LIMIT_DELAY) 
     if response.status_code == 200:
         data = response.json()
         return {item['market']: item['korean_name'] for item in data if item['market'].startswith("KRW-")}
@@ -55,8 +55,7 @@ def get_upbit_markets():
 def get_common_symbols():
     bybit_symbols = get_bybit_symbols()
     upbit_markets = get_upbit_markets()
-
-    # 공통 심볼 찾기
+    
     common_symbols = []
     for symbol in bybit_symbols:
         if symbol.endswith("USDT"):
@@ -67,7 +66,7 @@ def get_common_symbols():
 
     return common_symbols
 
-# DB 연결 및 테이블 생성
+# DB 연결
 def create_db_connection(db_name="symbols.db"):
     conn = sqlite3.connect(db_name)
     return conn
@@ -151,16 +150,16 @@ def fetch_krw_usd_multiple_requests(interval, day, max_retries=5, retry_delay=5)
 def get_usdt(interval, day, max_retries=5, retry_delay=5):
     start_ms, end_ms, start_time, end_time = calculate_time_period(day)
     end_time_upbit = end_time
-    start_time_upbit = end_time - timedelta(days=1)  # days 일수만큼 기간 설정
+    start_time_upbit = end_time - timedelta(days=1) 
     all_data = pd.DataFrame()
 
-    for i in range(day):  # 5일 단위로 데이터를 요청
+    for i in range(day):
         retries = 0
         while retries < max_retries:
             try:
                 df = pyupbit.get_ohlcv(ticker=f"KRW-USDT", interval=f"minute{interval}", count=1600, to=end_time_upbit, period=0.1)
 
-                if df is None or df.empty:  # 데이터가 없거나 비어있으면 종료
+                if df is None or df.empty:
                     print(f"Upbit 데이터 없음: {symbol}")
                     break
 
@@ -171,14 +170,12 @@ def get_usdt(interval, day, max_retries=5, retry_delay=5):
                 end_time_upbit = start_time_upbit
                 start_time_upbit = end_time_upbit - timedelta(days=1)
 
-                df.index = df.index.tz_localize("Asia/Seoul").tz_convert("UTC")  # UTC로 변환
+                df.index = df.index.tz_localize("Asia/Seoul").tz_convert("UTC")
                 df = df[["close"]]  # 'close' 열만 남기기
-                df = df.rename(columns={"close": f"KRW-USDT"})  # 열 이름 변경
-                df.index.name = 'timestamp'  # 인덱스를 'timestamp'로 설정
-
-                # 기존 데이터와 새로운 데이터 합치기 (timestamp 기준으로 최신 데이터로 덮어쓰는 방식)
+                df = df.rename(columns={"close": f"KRW-USDT"})
+                df.index.name = 'timestamp'
                 all_data = pd.concat([all_data, df])
-                break  # 데이터 가져오기가 성공하면 재시도 종료
+                break 
 
             except Exception as e:
                 print(f"Error fetching data for {symbol}: {e}")
@@ -188,18 +185,13 @@ def get_usdt(interval, day, max_retries=5, retry_delay=5):
                     time.sleep(retry_delay)
                 else:
                     print(f"Max retries reached for {symbol}. Skipping this request.")
-                    break  # 재시도 횟수 초과 시 중지
+                    break
 
     if all_data.empty:
         print(f"Upbit USDT 데이터가 반환되지 않았습니다: {symbol}")
 
-    # 중복된 timestamp 제거 (최신 데이터 우선)
     all_data = all_data[~all_data.index.duplicated(keep='last')]
-
-    # timestamp 기준으로 오름차순 정렬
-    all_data = all_data.sort_index()
-
-    # NaN 값을 이전 값으로 채우기 (결측값을 앞선 값으로 채움)
+    all_data = all_data.sort_index(
     all_data = all_data.ffill()
 
     return all_data
@@ -208,34 +200,31 @@ def get_usdt(interval, day, max_retries=5, retry_delay=5):
 def get_upbit_close_data(symbol, interval, day, max_retries=5, retry_delay=5):
     start_ms, end_ms, start_time, end_time = calculate_time_period(day)
     end_time_upbit = end_time
-    start_time_upbit = end_time - timedelta(days=1)  # days 일수만큼 기간 설정
+    start_time_upbit = end_time - timedelta(days=1)
     all_data = pd.DataFrame()
 
-    for i in range(day):  # 5일 단위로 데이터를 요청
+    for i in range(day): 
         retries = 0
         while retries < max_retries:
             try:
                 df = pyupbit.get_ohlcv(ticker=f"KRW-{symbol}", interval=f"minute{interval}", count=1600, to=end_time_upbit, period=0.1)
 
-                if df is None or df.empty:  # 데이터가 없거나 비어있으면 종료
+                if df is None or df.empty:
                     print(f"Upbit 데이터 없음: {symbol}")
                     break
 
                 print(f"{end_time_upbit}")
                 print(f"{start_time_upbit}")
 
-                # 5일씩 이전으로 이동
                 end_time_upbit = start_time_upbit
                 start_time_upbit = end_time_upbit - timedelta(days=1)
 
-                df.index = df.index.tz_localize("Asia/Seoul").tz_convert("UTC")  # UTC로 변환
+                df.index = df.index.tz_localize("Asia/Seoul").tz_convert("UTC") 
                 df = df[["close"]]  # 'close' 열만 남기기
-                df = df.rename(columns={"close": f"KRW-{symbol}"})  # 열 이름 변경 (예: 'KRW-1INCH')
-                df.index.name = 'timestamp'  # 인덱스를 'timestamp'로 설정
-
-                # 기존 데이터와 새로운 데이터 합치기 (timestamp 기준으로 최신 데이터로 덮어쓰는 방식)
+                df = df.rename(columns={"close": f"KRW-{symbol}"}))
+                df.index.name = 'timestamp'
                 all_data = pd.concat([all_data, df])
-                break  # 데이터 가져오기가 성공하면 재시도 종료
+                break
 
             except Exception as e:
                 print(f"Error fetching data for {symbol}: {e}")
@@ -245,20 +234,14 @@ def get_upbit_close_data(symbol, interval, day, max_retries=5, retry_delay=5):
                     time.sleep(retry_delay)
                 else:
                     print(f"Max retries reached for {symbol}. Skipping this request.")
-                    break  # 재시도 횟수 초과 시 중지
+                    break
 
     if all_data.empty:
         print(f"Upbit 데이터가 반환되지 않았습니다: {symbol}")
-
-    # 중복된 timestamp 제거 (최신 데이터 우선)
+        
     all_data = all_data[~all_data.index.duplicated(keep='last')]
-
-    # timestamp 기준으로 오름차순 정렬
     all_data = all_data.sort_index()
-
-    # NaN 값을 이전 값으로 채우기 (결측값을 앞선 값으로 채움)
     all_data = all_data.ffill()
-
     return all_data
 
 
@@ -269,7 +252,7 @@ def get_bybit_close_data(symbol, interval, day, max_retries=5, retry_delay=5):
     all_data = pd.DataFrame()
     all_closes = []
 
-    for i in range((24*day)//16 + 1):  # 하루씩 데이터를 요청
+    for i in range((24*day)//16 + 1):
         retries = 0
         while retries < max_retries:
             try:
@@ -278,28 +261,25 @@ def get_bybit_close_data(symbol, interval, day, max_retries=5, retry_delay=5):
                     symbol=f"{symbol}USDT",
                     interval=str(interval),
                     start=start_time,
-                    end=end_time,  # 하루 데이터만 요청
+                    end=end_time,
                     limit=1000
                 )
 
-                # response['result']['list']에서 데이터 추출
                 result_list = response['result'].get('list', [])
                 if not result_list:
                     print(f"데이터가 없습니다: {symbol}")
                     break
 
-                # 데이터가 있으면 all_closes 리스트에 추가
                 for data in result_list:
                     all_closes.append([data[0], data[4]])  # timestamp와 close 값만 추출
 
                 print(f"End Time (ms): {end_time}")
                 print(f"Start Time (ms): {start_time}")
 
-                # 하루씩 이전으로 이동
                 end_time = start_time
                 start_time = end_time - int(timedelta(hours=16).total_seconds() * 1000)
                 time.sleep(0.1)
-                break  # 데이터 가져오기가 성공하면 재시도 종료
+                break
 
             except Exception as e:
                 print(f"Error fetching data for {symbol}: {e}")
@@ -309,20 +289,15 @@ def get_bybit_close_data(symbol, interval, day, max_retries=5, retry_delay=5):
                     time.sleep(retry_delay)
                 else:
                     print(f"Max retries reached for {symbol}. Skipping this request.")
-                    break  # 재시도 횟수 초과 시 중지
+                    break
 
     if all_closes:
-        # 데이터프레임 생성
         df = pd.DataFrame(all_closes, columns=["timestamp", symbol])
         df["timestamp"] = pd.to_datetime(df["timestamp"].astype(int), unit='ms', utc=True)
         df.set_index("timestamp", inplace=True)
         df = df.rename(columns={symbol: f"{symbol[:-4]}"})  # '1INCHUSDT' -> '1INCH'
-        df.index.name = 'timestamp'  # 인덱스를 'timestamp'로 설정
-
-        # 중복된 timestamp 처리 (최신 데이터만 유지)
+        df.index.name = 'timestamp'
         df = df[~df.index.duplicated(keep='last')]
-
-        # timestamp 기준으로 오름차순 정렬
         df = df.sort_index(ascending=True)
         df = df.ffill()
 
@@ -338,7 +313,6 @@ def get_all_symbols_from_db():
     conn = sqlite3.connect('symbols.db')
     cursor = conn.cursor()
 
-    # symbols 테이블에서 모든 심볼을 가져옵니다.
     cursor.execute('SELECT symbol FROM symbols')
     symbols = [row[0] for row in cursor.fetchall()]
 
@@ -350,10 +324,8 @@ def save_to_db(symbol, bybit_data, upbit_data):
     conn = sqlite3.connect('symbols.db')
     cursor = conn.cursor()
 
-    # Upbit과 Bybit 데이터를 저장할 테이블 이름 생성 (특수 문자가 있을 수 있으므로 안전하게 따옴표로 감싸기)
-    table_name = f"'{symbol}'"  # 테이블 이름을 따옴표로 감싸서 안전하게 처리
+    table_name = f"'{symbol}'"
 
-    # 심볼에 대한 테이블이 존재하지 않으면 생성
     cursor.execute(f'''
     CREATE TABLE IF NOT EXISTS {table_name} (
         timestamp DATETIME PRIMARY KEY,
@@ -361,37 +333,30 @@ def save_to_db(symbol, bybit_data, upbit_data):
         bybit_close REAL
     )''')
 
-    # KRW/USD 데이터를 저장할 테이블 (ex_rate)
     cursor.execute('''
     CREATE TABLE IF NOT EXISTS ex_rate (
         timestamp DATETIME PRIMARY KEY,
         krw_usd REAL
     )''')
 
-    # Upbit과 Bybit 데이터 병합
     if not upbit_data.empty and not bybit_data.empty:
         # 두 DataFrame을 timestamp 기준으로 병합 (left join)
         merged_data = pd.merge(upbit_data, bybit_data, left_index=True, right_index=True, how='outer', suffixes=('_upbit', '_bybit'))
         merged_data = merged_data.ffill()
-        # 병합된 데이터 저장
         for timestamp, row in merged_data.iterrows():
             timestamp = timestamp.to_pydatetime()
 
-            # 각 테이블에 데이터를 삽입 (기존의 timestamp가 있을 경우 덮어쓰기)
             cursor.execute(f'''
             REPLACE INTO {table_name} (timestamp, upbit_close, bybit_close) VALUES (?, ?, ?)
             ''', (timestamp, row['KRW-' + symbol] if 'KRW-' + symbol in row else None, row[bybit_data.columns[0]] if bybit_data.columns[0] in row else None))
 
-    # 변경 사항 커밋
     conn.commit()
     conn.close()
 
 def save_krw_usd_to_db(krw_usd_data, db_path="symbols.db"):
-    # DB 연결
     conn = sqlite3.connect(db_path)
     cursor = conn.cursor()
 
-    # ex_rate 테이블이 없다면 생성
     cursor.execute('''
     CREATE TABLE IF NOT EXISTS ex_rate (
         timestamp DATETIME PRIMARY KEY,
@@ -399,30 +364,22 @@ def save_krw_usd_to_db(krw_usd_data, db_path="symbols.db"):
     )
     ''')
 
-    # KRW/USD 데이터가 비어 있지 않다면 DB에 저장
     if not krw_usd_data.empty:
         krw_usd_data = krw_usd_data.ffill()
         for timestamp, row in krw_usd_data.iterrows():
-            # timestamp를 datetime 형식으로 변환
             timestamp = timestamp.to_pydatetime()
-
-            # row['KRW_USD'] 값이 Series일 수 있으므로 .values[0]을 사용하여 값을 추출
             cursor.execute('''
             REPLACE INTO ex_rate (timestamp, krw_usd) VALUES (?, ?)
-            ''', (timestamp, row['KRW_USD'].values[0]))  # Series에서 값을 추출하여 저장
+            ''', (timestamp, row['KRW_USD'].values[0]))
 
-        # 변경 사항 커밋
         conn.commit()
 
-    # DB 연결 종료
     conn.close()
 
 def save_krw_usdt_to_db(krw_usdt_data, db_path="symbols.db"):
-    # DB 연결
     conn = sqlite3.connect(db_path)
     cursor = conn.cursor()
 
-    # ex_rate 테이블이 없다면 생성
     cursor.execute('''
     CREATE TABLE IF NOT EXISTS ex_usdt_rate (
         timestamp DATETIME PRIMARY KEY,
@@ -430,105 +387,81 @@ def save_krw_usdt_to_db(krw_usdt_data, db_path="symbols.db"):
     )
     ''')
 
-    # KRW/USD 데이터가 비어 있지 않다면 DB에 저장
     if not krw_usdt_data.empty:
         krw_usdt_data = krw_usdt_data.ffill()
         for timestamp, row in krw_usdt_data.iterrows():
-            # timestamp를 datetime 형식으로 변환
             timestamp = timestamp.to_pydatetime()
-
-            # row['KRW_USDT'] 값이 Series일 수 있으므로 .values[0]을 사용하여 값을 추출
             cursor.execute('''
             REPLACE INTO ex_usdt_rate (timestamp, krw_usdt) VALUES (?, ?)
-            ''', (timestamp, row['KRW-USDT']))  # Series에서 값을 추출하여 저장
+            ''', (timestamp, row['KRW-USDT'])  # Series에서 값을 추출하여 저장
 
-        # 변경 사항 커밋
         conn.commit()
 
-    # DB 연결 종료
     conn.close()
 
-# 모든 심볼에 대해 데이터 가져오기 및 DB에 저장
 def fetch_data_for_all_symbols(interval, day):
     symbols = get_all_symbols_from_db()
 
     for symbol in symbols:
         print(f"\nFetching data for {symbol}...")
 
-        # Upbit 데이터 가져오기
         upbit_data = get_upbit_close_data(symbol, interval, day)
         print(f"Upbit {symbol} 데이터:")
         print(upbit_data.head())
-        print(upbit_data.tail()) # 상위 5개 행 출력
-
-
-        # Bybit 데이터 가져오기
+        print(upbit_data.tail()) 
+        
         bybit_data = get_bybit_close_data(symbol, interval, day)
         print(f"Bybit {symbol} 데이터:")
         print(bybit_data.head())
-        print(bybit_data.tail()) # 상위 5개 행 출력
+        print(bybit_data.tail()) 
 
         save_to_db(symbol, bybit_data, upbit_data)
         print(f"Data saved to DB for {symbol}")
 
 
-# 호출 예시
-day = 5 # 예시로 5일
-interval = 1  # 1분 간격
+
+day = 5 
+interval = 1
 
 
-# KRW-USD 데이터 처리
 krw_usd_data = fetch_krw_usd_multiple_requests(interval, day)
 krw_usdt_data = get_usdt(interval, day)
 print(f"KRW-USD 데이터:")
 print(krw_usd_data.head())
-print(krw_usdt_data.head())  # 상위 5개 행 출력
+print(krw_usdt_data.head()) 
 
-# DB 저장 시 KRW-USD는 별도로 처리
-save_krw_usd_to_db(krw_usd_data)  # KRW-USD 데이터를 DB에 저장
+save_krw_usd_to_db(krw_usd_data)
 save_krw_usdt_to_db(krw_usdt_data)
 fetch_data_for_all_symbols(interval, day)
 
-
-# 데이터베이스 연결
 conn = sqlite3.connect('symbols.db')
 cursor = conn.cursor()
 
-# 'symbols' 테이블에서 symbol 가져오기
 cursor.execute('SELECT symbol FROM symbols')
 symbols = cursor.fetchall()
 
-# 실제 데이터베이스에 존재하는 테이블 목록 가져오기
 cursor.execute("SELECT name FROM sqlite_master WHERE type='table'")
 all_tables = [table[0] for table in cursor.fetchall()]
 
-# 각 symbol에 대해 작업 실행
 for symbol in symbols:
-    symbol_name = symbol[0]  # 예: '1INCH'
+    symbol_name = symbol[0] 
 
-    # 'symbol' 테이블이 실제로 존재하는지 확인
     if symbol_name in all_tables:
-        # 해당 테이블의 열 정보 확인
         cursor.execute(f"PRAGMA table_info('{symbol_name}')")
         columns = [column[1] for column in cursor.fetchall()]
-
-        # 'bybit_close_krw_usd' 열이 없으면 추가
+        
         if 'bybit_close_krw_usd' not in columns:
             cursor.execute(f'ALTER TABLE "{symbol_name}" ADD COLUMN bybit_close_krw_usd REAL')
 
-        # 'bybit_close_krw_usdt' 열이 없으면 추가
         if 'bybit_close_krw_usdt' not in columns:
             cursor.execute(f'ALTER TABLE "{symbol_name}" ADD COLUMN bybit_close_krw_usdt REAL')
 
-        # 'kimchi_premium_usd' 열이 없으면 추가 (기존 김프 계산용)
         if 'kimchi_premium_usd' not in columns:
             cursor.execute(f'ALTER TABLE "{symbol_name}" ADD COLUMN kimchi_premium_usd REAL')
 
-        # 'kimchi_premium_usdt' 열이 없으면 추가 (새로운 김프 계산용)
         if 'kimchi_premium_usdt' not in columns:
             cursor.execute(f'ALTER TABLE "{symbol_name}" ADD COLUMN kimchi_premium_usdt REAL')
 
-        # 'symbol'와 'ex_rate' 테이블을 timestamp 기준으로 조인하여 bybit_close * KRW_USD 값을 업데이트
         cursor.execute(f'''
             UPDATE "{symbol_name}"
             SET bybit_close_krw_usd = (
@@ -538,7 +471,6 @@ for symbol in symbols:
             )
         ''')
 
-        # 'symbol'와 'ex_usdt_rate' 테이블을 timestamp 기준으로 조인하여 bybit_close * KRW_USDT 값을 업데이트
         cursor.execute(f'''
             UPDATE "{symbol_name}"
             SET bybit_close_krw_usdt = (
@@ -548,7 +480,6 @@ for symbol in symbols:
             )
         ''')
 
-        # 'symbol'와 'ex_rate' 테이블을 timestamp 기준으로 조인하여 bybit_close * KRW_USD 값을 사용하여 김프 계산
         cursor.execute(f'''
             UPDATE "{symbol_name}"
             SET kimchi_premium_usd = (
@@ -558,7 +489,6 @@ for symbol in symbols:
             )
         ''')
 
-        # 'symbol'와 'ex_usdt_rate' 테이블을 timestamp 기준으로 조인하여 bybit_close * KRW_USDT 값을 사용하여 김프 계산
         cursor.execute(f'''
             UPDATE "{symbol_name}"
             SET kimchi_premium_usdt = (
@@ -568,7 +498,6 @@ for symbol in symbols:
             )
         ''')
 
-# 변경사항 커밋 및 연결 종료
 conn.commit()
 conn.close()
 

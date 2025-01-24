@@ -20,7 +20,7 @@ def get_bybit_symbols():
     url = f"{BYBIT_BASE_URL}{endpoint}"
     params = {"category": "linear"}
     response = requests.get(url, params=params)
-    time.sleep(RATE_LIMIT_DELAY)  # 요청 후 대기
+    time.sleep(RATE_LIMIT_DELAY)
     if response.status_code == 200:
         data = response.json()
         if data.get("retCode") == 0:
@@ -30,7 +30,6 @@ def get_bybit_symbols():
     else:
         raise Exception(f"Bybit HTTP Error: {response.status_code}, {response.text}")
 
-# Upbit 지원 마켓 조회
 def get_upbit_markets():
     url = f"{UPBIT_BASE_URL}/market/all"
     response = requests.get(url)
@@ -41,7 +40,6 @@ def get_upbit_markets():
     else:
         raise Exception(f"Upbit HTTP Error: {response.status_code}, {response.text}")
 
-# Bybit와 Upbit 공통 심볼 가져오기
 def get_common_symbols():
     bybit_symbols = get_bybit_symbols()
     upbit_markets = get_upbit_markets()
@@ -56,12 +54,10 @@ def get_common_symbols():
 
     return common_symbols
 
-# DB 연결
 def create_db_connection(db_name="symbols.db"):
     conn = sqlite3.connect(db_name)
     return conn
 
-# 심볼 테이블 생성 함수
 def create_table_if_not_exists(conn):
     cursor = conn.cursor()
     cursor.execute('''CREATE TABLE IF NOT EXISTS symbols (
@@ -69,16 +65,11 @@ def create_table_if_not_exists(conn):
                         symbol TEXT UNIQUE)''')
     conn.commit()
 
-# 공통 심볼을 DB에 저장
 def save_symbols_to_db(symbols, db_name="symbols.db"):
     conn = create_db_connection(db_name)
-
-    # 테이블 생성
     create_table_if_not_exists(conn)
-
     cursor = conn.cursor()
 
-    # 심볼을 DB에 저장
     for symbol in symbols:
         cursor.execute("INSERT OR IGNORE INTO symbols (symbol) VALUES (?)", (symbol,))
 
@@ -91,24 +82,20 @@ if __name__ == "__main__":
     print(f"Common Symbols: {common_symbols}")
     save_symbols_to_db(common_symbols)
 
-# Bybit API 설정
 session = HTTP(testnet=False)
 
-# 공통 기간 계산
 def calculate_time_period(day):
-    end_time = datetime.now(timezone.utc)  # 현재 UTC 시간
+    end_time = datetime.now(timezone.utc)
     start_time = end_time - timedelta(days=day)
     start_ms = int(start_time.timestamp() * 1000)
     end_ms = int(end_time.timestamp() * 1000)
     return start_ms, end_ms , start_time, end_time
 
-# USD/KRW 데이터 가져오기 함수
 def fetch_krw_usd_multiple_requests(interval, day, max_retries=5, retry_delay=5):
     start_ms, end_ms, start_time, end_time = calculate_time_period(day)
     start_time = end_time - timedelta(days=1)
     all_data = pd.DataFrame()
 
-    # 5일씩 데이터를 요청
     for i in range(day):
         retries = 0
         while retries < max_retries:
@@ -117,7 +104,7 @@ def fetch_krw_usd_multiple_requests(interval, day, max_retries=5, retry_delay=5)
                 if not data.empty:
                     data = data[['Close']].rename(columns={"Close": "KRW_USD"})
                     all_data = pd.concat([all_data, data])
-                break  # 데이터 가져오기가 성공하면 재시도 종료
+                break 
 
             except Exception as e:
                 print(f"Error fetching data for KRW/USD: {e}")
@@ -127,13 +114,11 @@ def fetch_krw_usd_multiple_requests(interval, day, max_retries=5, retry_delay=5)
                     time.sleep(retry_delay)
                 else:
                     print(f"Max retries reached for KRW/USD. Skipping this request.")
-                    break  # 재시도 횟수 초과 시 중지
+                    break
 
-        # 5일씩 이전으로 이동
         end_time = start_time
         start_time = end_time - timedelta(days=1)
 
-    # 중복된 데이터 제거 후 리셋
     all_data = all_data.sort_index()
     return all_data
 

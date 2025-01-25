@@ -7,25 +7,30 @@ Original file is located at
     https://colab.research.google.com/drive/1MVoGKVuiw4TD9NtbHvOySBrBwjCbwhFk
 """
 
-!apt-get install tor
-!service tor start
-!pip install pyupbit
-!pip install pybit
+# !apt-get install tor
+# !service tor start
+# !pip install pyupbit
+# !pip install pybit
 
-# 연결된 Tor의 SOCKS proxy 사용
-import socket
-import socks
+# # 연결된 Tor의 SOCKS proxy 사용
+# import socket
+# import socks
 
-socks.set_default_proxy(socks.SOCKS5, "127.0.0.1", 9050)
-socket.socket = socks.socksocket
+# socks.set_default_proxy(socks.SOCKS5, "127.0.0.1", 9050)
+# socket.socket = socks.socksocket
 
-# IP 주소가 변경된 것을 확인
-import requests
-print(requests.get('https://httpbin.org/ip').text)
+# # IP 주소가 변경된 것을 확인
+# import requests
+# print(requests.get('https://httpbin.org/ip').text)
 
 import sqlite3
 import requests
+import pandas as pd
+from datetime import datetime, timedelta, timezone
 import time
+import pyupbit
+from pybit.unified_trading import HTTP
+import yfinance as yf
 
 BYBIT_BASE_URL = "https://api.bybit.com"
 UPBIT_BASE_URL = "https://api.upbit.com/v1"
@@ -110,14 +115,6 @@ if __name__ == "__main__":
     common_symbols = get_common_symbols()
     print(f"Common Symbols: {common_symbols}")
     save_symbols_to_db(common_symbols)
-
-import sqlite3
-import pandas as pd
-from datetime import datetime, timedelta, timezone
-import time
-import pyupbit
-from pybit.unified_trading import HTTP
-import yfinance as yf
 
 # Bybit API 설정
 session = HTTP(testnet=False)
